@@ -1,0 +1,6 @@
+# Request
+float64[6] joints
+geometry_msgs/Pose target_pose
+---
+# Response
+moveit_msgs/RobotTrajectory[] trajectories
