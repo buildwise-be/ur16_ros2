@@ -1,0 +1,18 @@
+{
+    "python.autoComplete.extraPaths": [
+        "/home/acandael/ros2_ws/install/moveit_task_constructor_core/lib/python3.12/site-packages",
+        "/home/acandael/ros2_ws/install/moveit_task_constructor_msgs/lib/python3.12/site-packages",
+        "/home/acandael/ros2_ws/install/moveit_py/lib/python3.12/site-packages",
+        "/home/acandael/ros2_ws/install/moveit_msgs/lib/python3.12/site-packages",
+        "/home/acandael/ros2_ws/install/moveit_configs_utils/lib/python3.12/site-packages",
+        "/opt/ros/jazzy/lib/python3.12/site-packages"
+    ],
+    "python.analysis.extraPaths": [
+        "/home/acandael/ros2_ws/install/moveit_task_constructor_core/lib/python3.12/site-packages",
+        "/home/acandael/ros2_ws/install/moveit_task_constructor_msgs/lib/python3.12/site-packages",
+        "/home/acandael/ros2_ws/install/moveit_py/lib/python3.12/site-packages",
+        "/home/acandael/ros2_ws/install/moveit_msgs/lib/python3.12/site-packages",
+        "/home/acandael/ros2_ws/install/moveit_configs_utils/lib/python3.12/site-packages",
+        "/opt/ros/jazzy/lib/python3.12/site-packages"
+    ]
+}
