@@ -3,9 +3,10 @@
   <!-- robot name parameter -->
   <xacro:arg name="name" default="ur"/>
 
-  <!-- import mir250 macro -->
+  <!-- import mir250, ur16e, and fixed objects macro -->
   <xacro:include filename="$(find mir250_ur16e_description)/urdf/mir250_fixed.urdf.xacro"/>
   <xacro:include filename="$(find ur_description)/urdf/ur_macro.xacro"/>
+  <xacro:include filename="$(find mir250_ur16e_description)/urdf/fixed_objects.xacro"/>
   <!-- ros2 control include -->
   <xacro:include filename="$(find ur_robot_driver)/urdf/ur.ros2_control.xacro" />
   <xacro:include filename="$(find ur_description)/urdf/inc/ur_transmissions.xacro" />
@@ -68,6 +69,10 @@
 	>
   </xacro:mir_robot>
 
+  <!-- fixed objects -->
+  <xacro:fixed_objects tf_prefix="$(arg mir_tf_prefix)"/>
+
+  <!-- ur16e robot -->
   <xacro:ur_robot
     name="$(arg name)"
     tf_prefix="$(arg tf_prefix)"
