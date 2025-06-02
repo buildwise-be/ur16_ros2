@@ -6,7 +6,7 @@
   <!-- import mir250, ur16e, and fixed objects macro -->
   <xacro:include filename="$(find mir250_ur16e_description)/urdf/mir250_fixed.urdf.xacro"/>
   <xacro:include filename="$(find ur_description)/urdf/ur_macro.xacro"/>
-  <xacro:include filename="$(find mir250_ur16e_description)/urdf/fixed_objects.xacro"/>
+  <xacro:include filename="$(find mir250_ur16e_description)/urdf/fixed_objects.urdf.xacro"/>
   <!-- ros2 control include -->
   <xacro:include filename="$(find ur_robot_driver)/urdf/ur.ros2_control.xacro" />
   <xacro:include filename="$(find ur_description)/urdf/inc/ur_transmissions.xacro" />
@@ -85,7 +85,7 @@
     safety_pos_margin="$(arg safety_pos_margin)"
     safety_k_position="$(arg safety_k_position)"
     >
-  <origin xyz="-0.155 0 -0.03" rpy="0 0 ${pi/2.0}" />          <!-- position robot in the world -->
+  <origin xyz="0.155 0 -0.03" rpy="0 0 -${pi/2.0}" />          <!-- position robot in the world -->
   </xacro:ur_robot>
 
   <!-- ros2 control instance -->
