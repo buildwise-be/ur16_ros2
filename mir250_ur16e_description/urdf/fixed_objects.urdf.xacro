@@ -28,7 +28,7 @@
         <joint name="platform_to_box" type="fixed">
                 <parent link="platform"/>
                 <child link="control_box"/>
-                <origin xyz="-0.235 0 0.2575" rpy="0 0 0"/>
+                <origin xyz="-0.255 0 0.2575" rpy="0 0 0"/>
         </joint>
 
         <link name="platform">
@@ -74,11 +74,6 @@
                         </geometry>
                 </collision>
         </link>
-	<joint name="ground_joint" type="fixed">
-                <parent link="${tf_prefix}world"/>
-                <child link="ground_plane"/>
-                <origin xyz="0 0 0" rpy="0 0 0"/>
-        </joint>
         <joint name="ground_to_mir" type="fixed">
                 <parent link="ground_plane"/>
                 <child link="${tf_prefix}world"/>
