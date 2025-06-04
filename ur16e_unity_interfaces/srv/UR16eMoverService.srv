@@ -1,6 +1,9 @@
-# Request
-float64[6] joints
+# UR16eMoverService.srv
+
+# --- Request ---
 geometry_msgs/Pose target_pose
 ---
-# Response
-moveit_msgs/RobotTrajectory[] trajectories
+# --- Response ---
+bool success
+string error_message
+moveit_msgs/RobotTrajectory trajectory
