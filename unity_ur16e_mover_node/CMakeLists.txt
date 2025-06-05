@@ -13,7 +13,6 @@ find_package(moveit_core          REQUIRED)
 find_package(moveit_ros_planning  REQUIRED)
 find_package(moveit_ros_planning_interface REQUIRED)
 find_package(ur16e_unity_interfaces REQUIRED)
-find_package(tf2_geometry_msgs    REQUIRED)
 
 add_executable(unity_ur16e_mover src/unity_ur16e_mover.cpp)
 ament_target_dependencies(
@@ -25,7 +24,6 @@ ament_target_dependencies(
   moveit_ros_planning
   moveit_ros_planning_interface
   ur16e_unity_interfaces
-  tf2_geometry_msgs
 )
 
 install(TARGETS

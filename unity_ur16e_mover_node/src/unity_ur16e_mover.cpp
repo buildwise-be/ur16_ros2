@@ -1,9 +1,8 @@
 #include <rclcpp/rclcpp.hpp>
 #include <geometry_msgs/msg/pose.hpp>
-#include <moveit/move_group_interface/move_group_interface.h>
-#include <moveit/planning_scene_interface/planning_scene_interface.h>
+#include <moveit/move_group_interface/move_group_interface.hpp>
+#include <moveit/planning_scene_interface/planning_scene_interface.hpp>
 #include <moveit_msgs/msg/robot_trajectory.hpp>
-#include <tf2_geometry_msgs/tf2_geometry_msgs.h>
 
 #include "ur16e_unity_interfaces/srv/ur16e_mover_service.hpp"
 
@@ -72,7 +71,7 @@ private:
     // 4) Copy the trajectory into the service response
     response->success = true;
     response->error_message = "";
-    response->trajectory = my_plan.trajectory_;  // RobotTrajectory
+    response->trajectory = my_plan.trajectory;  // RobotTrajectory
 
     RCLCPP_INFO(this->get_logger(),
                 "Plan succeeded. Returning trajectory with %zu waypoints.",
