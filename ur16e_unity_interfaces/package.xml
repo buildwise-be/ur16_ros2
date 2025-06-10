@@ -17,6 +17,11 @@
   <exec_depend>geometry_msgs</exec_depend>
   <build_depend>moveit_msgs</build_depend>
   <exec_depend>moveit_msgs</exec_depend>
+  <build_depend>shape_msgs</build_depend>
+  <exec_depend>shape_msgs</exec_depend>
+
+  <build_depend>builtin_interfaces</build_depend>
+  <exec_depend>builtin_interfaces</exec_depend>
 
   <test_depend>ament_lint_auto</test_depend>
   <test_depend>ament_lint_common</test_depend>
