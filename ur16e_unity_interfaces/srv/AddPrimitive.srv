@@ -1,0 +1,13 @@
+# Request
+string    type                   # "BOX" or "PLANE"
+geometry_msgs/Pose    pose
+geometry_msgs/Vector3 dimensions           # For BOX: [x,y,z]; for PLANE: [width, height, _] (thickness ignored)
+bool      remove                 # true to remove this object instead of adding
+string	id	# the GUID of the unity gameObject, created on the fly by unity when doing the call
+
+---
+# Response
+bool      success
+string    message
+string 	id	# the GUID of the unity gameObject
+bool remove
