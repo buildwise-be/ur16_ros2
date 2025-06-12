@@ -16,6 +16,7 @@ find_package(rosidl_default_generators REQUIRED)
 rosidl_generate_interfaces(${PROJECT_NAME}
 	"srv/UR16eMoverService.srv"
 	"srv/UpdatePlanningScene.srv"
+	"srv/AddPrimitive.srv"
 	DEPENDENCIES geometry_msgs moveit_msgs shape_msgs builtin_interfaces
        	)
 
