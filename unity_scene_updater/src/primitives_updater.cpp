@@ -10,16 +10,16 @@ using std::placeholders::_1;
 using std::placeholders::_2;
 using AddPrimitive = ur16e_unity_interfaces::srv::AddPrimitive;
 
-class UnitySceneUpdater : public rclcpp::Node
+class PrimitivesUpdater : public rclcpp::Node
 {
 public:
-  UnitySceneUpdater()
+  PrimitivesUpdater()
   : Node("planning_scene_updater")
   {
     planning_scene_interface_ = std::make_shared<moveit::planning_interface::PlanningSceneInterface>();
     service_ = this->create_service<AddPrimitive>(
       "add_primitive_object",
-      std::bind(&UnitySceneUpdater::handle_service, this, _1, _2));
+      std::bind(&PrimitivesUpdater::handle_service, this, _1, _2));
     RCLCPP_INFO(this->get_logger(), "Service 'add_primitive_object' is ready.");
   }
 
@@ -88,7 +88,7 @@ private:
 int main(int argc, char** argv)
 {
   rclcpp::init(argc, argv);
-  rclcpp::spin(std::make_shared<UnitySceneUpdater>());
+  rclcpp::spin(std::make_shared<PrimitivesUpdater>());
   rclcpp::shutdown();
   return 0;
 }
