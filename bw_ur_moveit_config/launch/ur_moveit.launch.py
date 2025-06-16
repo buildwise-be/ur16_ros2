@@ -160,7 +160,7 @@ def generate_launch_description():
         ],
     )
 
-    # <<< 4) NEW: unity_ur16e_mover service node >>>
+    # unity_ur16e_mover service node
     service_node = Node(
         package="unity_ur16e_mover_node",       # your C++ node’s package
         executable="unity_ur16e_mover",         # the name of the executable
@@ -172,7 +172,16 @@ def generate_launch_description():
             {"use_sim_time": use_sim_time},          # if you want the service node to use sim time
         ],
     )
-    # <<< end of added block >>>
+
+    # primitive scene updater node
+    primitives_updater_node = Node(
+        package="unity_scene_updater",
+        executable="primitives_updater",
+        output="screen",
+        parameters=[
+            {"use_sim_time": use_sim_time},
+        ],
+    )
 
     #
     # We want to start MoveIt, RViz, Servo and the service node
@@ -186,7 +195,8 @@ def generate_launch_description():
                     move_group_node,
                     rviz_node,
                     servo_node,
-                    service_node,    # <<< add our service node here
+                    service_node,
+                    primitives_updater_node,
                 ],
             )
         ),
