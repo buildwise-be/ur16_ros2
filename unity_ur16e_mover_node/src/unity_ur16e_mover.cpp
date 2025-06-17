@@ -3,11 +3,13 @@
 #include <moveit/move_group_interface/move_group_interface.hpp>
 #include <moveit/planning_scene_interface/planning_scene_interface.hpp>
 #include <moveit_msgs/msg/robot_trajectory.hpp>
+#include <std_srvs/srv/trigger.hpp>
 
 #include "ur16e_unity_interfaces/srv/ur16e_mover_service.hpp"
 
-using UR16eService        = ur16e_unity_interfaces::srv::UR16eMoverService;
-using RobotTrajectoryMsg  = moveit_msgs::msg::RobotTrajectory;
+using UR16eService       = ur16e_unity_interfaces::srv::UR16eMoverService;
+using TriggerService     = std_srvs::srv::Trigger;
+using RobotTrajectoryMsg = moveit_msgs::msg::RobotTrajectory;
 
 class UnityUR16eMover : public rclcpp::Node
 {
@@ -15,78 +17,85 @@ public:
   UnityUR16eMover()
   : Node("unity_ur16e_mover")
   {
-    // Create MoveGroupInterface for the UR16e planning group.
-    // Adjust the planning group name if needed.
     const std::string PLANNING_GROUP = "ur_manipulator";
     move_group_ = std::make_shared<moveit::planning_interface::MoveGroupInterface>(
       shared_from_this(), PLANNING_GROUP);
 
-    // Optionally set planner parameters here (tolerances, planner, etc.)
-    // move_group_->setPlannerId("RRTConnectkConfigDefault");
-    // move_group_->setPlanningTime(5.0);
-
-    // Create the service:
-    service_ = this->create_service<UR16eService>(
+    service_plan_ = this->create_service<UR16eService>(
       "ur16e_mover_service",
-      std::bind(&UnityUR16eMover::handle_service, this,
-                std::placeholders::_1, std::placeholders::_2));
-    RCLCPP_INFO(this->get_logger(),
-                "Service 'ur16e_mover_service' ready to plan for UR16e.");
+      std::bind(&UnityUR16eMover::handle_planning_service, this, std::placeholders::_1, std::placeholders::_2));
+
+    service_execute_ = this->create_service<TriggerService>(
+      "ur16e_execute_trajectory",
+      std::bind(&UnityUR16eMover::handle_execute_service, this, std::placeholders::_1, std::placeholders::_2));
+
+    RCLCPP_INFO(this->get_logger(), "Services 'ur16e_mover_service' and 'ur16e_execute_trajectory' are ready.");
   }
 
 private:
-  void handle_service(
-    const std::shared_ptr<UR16eService::Request>  request,
-    std::shared_ptr<UR16eService::Response>       response)
+  void handle_planning_service(
+    const std::shared_ptr<UR16eService::Request> request,
+    std::shared_ptr<UR16eService::Response> response)
   {
-    // 1) Extract the target pose from the request
     geometry_msgs::msg::Pose target_pose = request->target_pose;
-
-    RCLCPP_INFO(this->get_logger(),
-                "Received planning request: [%.3f, %.3f, %.3f] (orientation: [%.3f, %.3f, %.3f, %.3f])",
-                target_pose.position.x,
-                target_pose.position.y,
-                target_pose.position.z,
-                target_pose.orientation.x,
-                target_pose.orientation.y,
-                target_pose.orientation.z,
-                target_pose.orientation.w);
-
-    // 2) Set the pose target on MoveGroupInterface
     move_group_->setPoseTarget(target_pose);
 
-    // 3) Plan
     moveit::planning_interface::MoveGroupInterface::Plan my_plan;
     bool success = static_cast<bool>(move_group_->plan(my_plan));
 
     if (!success)
     {
-      std::string err = "MoveIt plan() returned false.";
-      RCLCPP_WARN(this->get_logger(), err.c_str());
+      std::string err = "MoveIt plan() failed.";
+      RCLCPP_WARN(this->get_logger(), "%s", err.c_str());
       response->success = false;
       response->error_message = err;
       return;
     }
 
-    // 4) Copy the trajectory into the service response
+    last_trajectory_ = my_plan.trajectory;
+    has_trajectory_ = true;
+
     response->success = true;
     response->error_message = "";
-    response->trajectory = my_plan.trajectory;  // RobotTrajectory
+    response->trajectory = my_plan.trajectory;
 
-    RCLCPP_INFO(this->get_logger(),
-                "Plan succeeded. Returning trajectory with %zu waypoints.",
-                response->trajectory.joint_trajectory.points.size());
+    RCLCPP_INFO(this->get_logger(), "Planning successful. Trajectory stored.");
   }
 
-  rclcpp::Service<UR16eService>::SharedPtr                           service_;
-  std::shared_ptr<moveit::planning_interface::MoveGroupInterface>    move_group_;
+  void handle_execute_service(
+    const std::shared_ptr<TriggerService::Request> /*request*/,
+    std::shared_ptr<TriggerService::Response> response)
+  {
+    if (!has_trajectory_)
+    {
+      std::string err = "No trajectory available for execution.";
+      RCLCPP_WARN(this->get_logger(), "%s", err.c_str());
+      response->success = false;
+      response->message = err;
+      return;
+    }
+
+    moveit::planning_interface::MoveGroupInterface::Plan plan_to_execute;
+    plan_to_execute.trajectory_ = last_trajectory_;
+
+    move_group_->execute(plan_to_execute);
+    response->success = true;
+    response->message = "Trajectory executed.";
+    RCLCPP_INFO(this->get_logger(), "Stored trajectory executed.");
+  }
+
+  rclcpp::Service<UR16eService>::SharedPtr service_plan_;
+  rclcpp::Service<TriggerService>::SharedPtr service_execute_;
+  std::shared_ptr<moveit::planning_interface::MoveGroupInterface> move_group_;
+
+  RobotTrajectoryMsg last_trajectory_;
+  bool has_trajectory_ = false;
 };
 
 int main(int argc, char** argv)
 {
   rclcpp::init(argc, argv);
-  auto node = std::make_shared<UnityUR16eMover>();
-  rclcpp::spin(node);
+  rclcpp::spin(std::make_shared<UnityUR16eMover>());
   rclcpp::shutdown();
   return 0;
 }
