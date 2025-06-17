@@ -14,22 +14,26 @@ using RobotTrajectoryMsg = moveit_msgs::msg::RobotTrajectory;
 class UnityUR16eMover : public rclcpp::Node
 {
 public:
-  UnityUR16eMover()
-  : Node("unity_ur16e_mover")
+  explicit UnityUR16eMover(const rclcpp::NodeOptions & opts = {})
+  : Node("unity_ur16e_mover", opts)
+  {
+    // only make the services here — no shared_from_this() yet
+    service_plan_ = this->create_service<UR16eService>(
+      "ur16e_mover_service",
+      std::bind(&UnityUR16eMover::handle_planning_service, this, _1, _2));
+    service_execute_ = this->create_service<TriggerService>(
+      "ur16e_execute_trajectory",
+      std::bind(&UnityUR16eMover::handle_execute_service, this, _1, _2));
+    RCLCPP_INFO(get_logger(), "Services ready (MoveGroup deferred).");
+  }
+
+  /// Must be called on a fully constructed shared_ptr<...>
+  void init_move_group()
   {
     const std::string PLANNING_GROUP = "ur_manipulator";
     move_group_ = std::make_shared<moveit::planning_interface::MoveGroupInterface>(
       shared_from_this(), PLANNING_GROUP);
-
-    service_plan_ = this->create_service<UR16eService>(
-      "ur16e_mover_service",
-      std::bind(&UnityUR16eMover::handle_planning_service, this, std::placeholders::_1, std::placeholders::_2));
-
-    service_execute_ = this->create_service<TriggerService>(
-      "ur16e_execute_trajectory",
-      std::bind(&UnityUR16eMover::handle_execute_service, this, std::placeholders::_1, std::placeholders::_2));
-
-    RCLCPP_INFO(this->get_logger(), "Services 'ur16e_mover_service' and 'ur16e_execute_trajectory' are ready.");
+    RCLCPP_INFO(get_logger(), "MoveGroupInterface initialized.");
   }
 
 private:
@@ -76,7 +80,7 @@ private:
     }
 
     moveit::planning_interface::MoveGroupInterface::Plan plan_to_execute;
-    plan_to_execute.trajectory_ = last_trajectory_;
+    plan_to_execute.trajectory = last_trajectory_;
 
     move_group_->execute(plan_to_execute);
     response->success = true;
@@ -92,10 +96,12 @@ private:
   bool has_trajectory_ = false;
 };
 
-int main(int argc, char** argv)
+int main(int argc, char ** argv)
 {
   rclcpp::init(argc, argv);
-  rclcpp::spin(std::make_shared<UnityUR16eMover>());
+  auto node = std::make_shared<UnityUR16eMover>();
+  node->init_move_group();            // <<-- now shared_from_this() works
+  rclcpp::spin(node);
   rclcpp::shutdown();
   return 0;
 }
