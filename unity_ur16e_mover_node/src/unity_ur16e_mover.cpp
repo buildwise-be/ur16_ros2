@@ -3,13 +3,16 @@
 #include <moveit/move_group_interface/move_group_interface.hpp>
 #include <moveit/planning_scene_interface/planning_scene_interface.hpp>
 #include <moveit_msgs/msg/robot_trajectory.hpp>
-#include <std_srvs/srv/trigger.hpp>
+#include <std_srvs/srv/set_bool.hpp>
 
 #include "ur16e_unity_interfaces/srv/ur16e_mover_service.hpp"
 
 using UR16eService       = ur16e_unity_interfaces::srv::UR16eMoverService;
-using TriggerService     = std_srvs::srv::Trigger;
+using ExecuteService     = std_srvs::srv::SetBool;
 using RobotTrajectoryMsg = moveit_msgs::msg::RobotTrajectory;
+
+using std::placeholders::_1;
+using std::placeholders::_2;
 
 class UnityUR16eMover : public rclcpp::Node
 {
@@ -21,7 +24,7 @@ public:
     service_plan_ = this->create_service<UR16eService>(
       "ur16e_mover_service",
       std::bind(&UnityUR16eMover::handle_planning_service, this, _1, _2));
-    service_execute_ = this->create_service<TriggerService>(
+    service_execute_ = this->create_service<ExecuteService>(
       "ur16e_execute_trajectory",
       std::bind(&UnityUR16eMover::handle_execute_service, this, _1, _2));
     RCLCPP_INFO(get_logger(), "Services ready (MoveGroup deferred).");
@@ -67,8 +70,8 @@ private:
   }
 
   void handle_execute_service(
-    const std::shared_ptr<TriggerService::Request> /*request*/,
-    std::shared_ptr<TriggerService::Response> response)
+    const std::shared_ptr<ExecuteService::Request> /*request*/,
+    std::shared_ptr<ExecuteService::Response> response)
   {
     if (!has_trajectory_)
     {
@@ -89,7 +92,7 @@ private:
   }
 
   rclcpp::Service<UR16eService>::SharedPtr service_plan_;
-  rclcpp::Service<TriggerService>::SharedPtr service_execute_;
+  rclcpp::Service<ExecuteService>::SharedPtr service_execute_;
   std::shared_ptr<moveit::planning_interface::MoveGroupInterface> move_group_;
 
   RobotTrajectoryMsg last_trajectory_;
