@@ -4,6 +4,7 @@
 #include <moveit/planning_scene_interface/planning_scene_interface.hpp>
 #include <moveit_msgs/msg/robot_trajectory.hpp>
 #include <std_srvs/srv/set_bool.hpp>
+#include <moveit/utils/moveit_error_code.h>
 
 #include "ur16e_unity_interfaces/srv/ur16e_mover_service.hpp"
 
@@ -46,8 +47,25 @@ private:
   {
     geometry_msgs::msg::Pose target_pose = request->target_pose;
     move_group_->setPoseTarget(target_pose);
-
     moveit::planning_interface::MoveGroupInterface::Plan my_plan;
+
+    moveit::core::MoveItErrorCode error_code = move_group_->plan(my_plan);
+    if (!error_code)
+    {
+      // Convert code to string
+      std::string reason = moveit::core::errorCodeToString(error_code);
+      // Log both the enum name and the numeric value
+      RCLCPP_WARN(
+        get_logger(),
+        "MoveIt plan() failed: %s (%d)",
+        reason.c_str(), error_code.val);
+    
+      response->success = false;
+      response->error_message = reason;
+      return;
+    }
+
+    /*
     bool success = static_cast<bool>(move_group_->plan(my_plan));
 
     if (!success)
@@ -58,6 +76,7 @@ private:
       response->error_message = err;
       return;
     }
+    */
 
     last_trajectory_ = my_plan.trajectory;
     has_trajectory_ = true;
