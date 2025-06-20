@@ -1,18 +1,18 @@
-# ur16_ros2
+# UR16e - Unity ROS2 packages
 :dizzy: ROS2 packages to help manipulate the UR16e. :dizzy:
 
 ## Packages included
 The following packages are included:
-- mir250_ur16e_moveit_config
-- mir250_ur16e_description
+- bw_ur_moveit_config
+- unity_scene_updater
 - ur16e_mover
 - ur16e_unity_interfaces
 
-## mir250_ur16e_moveit_config package
-This package is directly taken from the jazzy branch of Universal Robots ur_moveit_config package (see [here](https://github.com/UniversalRobots/Universal_Robots_ROS2_Driver/tree/jazzy/ur_moveit_config)). It allows to launch Moveit2 with the custom URDF file provided by the mir250_ur16e_description package from this repo.
+## bw_ur_moveit_config package
+This package is directly taken from the jazzy branch of Universal Robots ur_moveit_config package (see [here](https://github.com/UniversalRobots/Universal_Robots_ROS2_Driver/tree/jazzy/ur_moveit_config)). It is slightly modified to launch some additional custom nodes from the mover and scene_updater packages.
 
-## mir250_ur16e_description package
-This package is built on top of the urdf (xacro) files of the ur_robot_driver package of Universal Robots (see [here](https://github.com/UniversalRobots/Universal_Robots_ROS2_Driver/tree/main/ur_robot_driver)). It adds the MIR250 robot under it, as well as some obstacles.
+## unity_scene_updater package
+This package is meant to add obstacles to the ros scene from Unity GameObjects.
 
 ## ur16e_mover package
 This package provides a ROS2 Node that creates a UR16eMoverService Service, to which a Unity app can publish to. This Service type is defined in the ur16e_unity_interfaces package.
@@ -21,6 +21,8 @@ This package provides a ROS2 Node that creates a UR16eMoverService Service, to w
 This package defines interfaces for Unity-ROS2 communication.
 It defines the following services:
 - UR16eMoverService
+- AddPrimitive
+- UpdatePlanningScene
 
 ### UR16eMoverService
 
@@ -30,3 +32,28 @@ geometry_msgs/Pose target_pose
 \---  
 \# Response  
 moveit_msgs/RobotTrajectory[] trajectories  
+
+### AddPrimitive
+\# Request
+string    type                   \# "BOX" or "PLANE"
+geometry_msgs/Pose    pose
+geometry_msgs/Vector3 dimensions           # For BOX: [x,y,z]; for PLANE: [width, height, _] (thickness ignored)
+bool      remove                 # true to remove this object instead of adding
+string	id	# the GUID of the unity gameObject, created on the fly by unity when doing the call
+\---
+\# Response
+bool      success
+string    message
+string 	id	# the GUID of the unity gameObject
+bool remove
+
+### UpdatePlanningScene
+\# Request
+string id
+shape_msgs/Mesh mesh
+geometry_msgs/Pose pose
+string frame_id
+\---
+\# Response
+bool success
+string message
