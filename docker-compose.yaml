@@ -1,0 +1,16 @@
+services:
+  ur_container:
+    image: ur-jazzy:latest
+    ports:
+      - "10000:10000"
+      - "50001-50004:50001-50004"
+    environment:
+      - DISPLAY=${DISPLAY}  # Forward host display
+      - QT_X11_NO_MITSHM=1  # Avoid MIT-SHM errors
+    volumes:
+      - /tmp/.X11-unix:/tmp/.X11-unix:rw    
+    privileged: true         # Optional, but sometimes needed for drivers
+    stdin_open: true       # equivalent to -it
+    tty: true              # for interactive shell
+    command: /bin/bash
+    restart: "no"          # don't restart after exit
