@@ -5,6 +5,7 @@
 #include <shape_msgs/msg/solid_primitive.hpp>
 #include <moveit/planning_scene_interface/planning_scene_interface.hpp>
 #include <moveit_msgs/msg/collision_object.hpp>
+#include <optional>
 
 using std::placeholders::_1;
 using std::placeholders::_2;
@@ -28,6 +29,20 @@ private:
     const std::shared_ptr<AddPrimitive::Request> request,
     std::shared_ptr<AddPrimitive::Response> response)
   {
+    if (!current_session_id_ || request->session_id != current_session_id_) {
+      // New session: clear all obstacles
+      auto known_objects = planning_scene_interface_->getKnownObjectNames();
+      if (!known_objects.empty()) {
+        planning_scene_interface_->removeCollisionObjects(known_objects);
+        RCLCPP_INFO(this->get_logger(), "New session %d detected. Cleared %zu existing objects.",
+                    request->session_id, known_objects.size());
+      } else {
+        RCLCPP_INFO(this->get_logger(), "New session %d detected. No existing objects to clear.",
+                    request->session_id);
+      }
+      current_session_id_ = request->session_id;
+    }
+
     const std::string& object_id = request->id;
 
     if (request->remove)
@@ -43,7 +58,7 @@ private:
 
     moveit_msgs::msg::CollisionObject collision_object;
     collision_object.id = object_id;
-    collision_object.header.frame_id = "world";  // Assuming the planning frame is "world"
+    collision_object.header.frame_id = "world";
 
     shape_msgs::msg::SolidPrimitive primitive;
 
@@ -83,6 +98,7 @@ private:
 
   rclcpp::Service<AddPrimitive>::SharedPtr service_;
   std::shared_ptr<moveit::planning_interface::PlanningSceneInterface> planning_scene_interface_;
+  std::optional<int32_t> current_session_id_;  // Stores the active session ID
 };
 
 int main(int argc, char** argv)

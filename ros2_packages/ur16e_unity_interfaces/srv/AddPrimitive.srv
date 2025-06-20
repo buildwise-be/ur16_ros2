@@ -1,4 +1,5 @@
 # Request
+int32     session_id            # Identifies the Unity session
 string    type                   # "BOX" or "PLANE"
 geometry_msgs/Pose    pose
 geometry_msgs/Vector3 dimensions           # For BOX: [x,y,z]; for PLANE: [width, height, _] (thickness ignored)
