@@ -41,52 +41,64 @@ public:
   }
 
 private:
-  void handle_planning_service(
-    const std::shared_ptr<UR16eService::Request> request,
-    std::shared_ptr<UR16eService::Response> response)
+void handle_planning_service(
+  const std::shared_ptr<UR16eService::Request> request,
+  std::shared_ptr<UR16eService::Response> response)
+{
+  geometry_msgs::msg::Pose target_pose = request->target_pose;
+  moveit_msgs::msg::RobotTrajectory trajectory;
+  moveit::core::MoveItErrorCode error_code;
+
+  if (request->use_cartesian)
   {
-    geometry_msgs::msg::Pose target_pose = request->target_pose;
+    std::vector<geometry_msgs::msg::Pose> waypoints;
+    waypoints.push_back(target_pose);
+
+    double eef_step = 0.01;  // resolution in meters
+    double jump_threshold = 0.0;  // disable jump detection for now
+
+    double fraction = move_group_->computeCartesianPath(
+      waypoints, eef_step, jump_threshold, trajectory);
+
+    if (fraction < 0.75)
+    {
+      response->success = false;
+      response->error_message = "Cartesian path planning incomplete. Fraction: " + std::to_string(fraction);
+      reponse->planned_fraction = fraction;
+      RCLCPP_WARN(this->get_logger(), "Cartesian path planning incomplete. Fraction: %.2f", fraction);
+      return;
+    }
+
+    RCLCPP_INFO(this->get_logger(), "Cartesian path planning successful. Fraction: %.2f", fraction);
+  }
+  else
+  {
     move_group_->setPoseTarget(target_pose);
     moveit::planning_interface::MoveGroupInterface::Plan my_plan;
+    error_code = move_group_->plan(my_plan);
 
-    moveit::core::MoveItErrorCode error_code = move_group_->plan(my_plan);
     if (!error_code)
     {
-      // Convert code to string
       std::string reason = moveit::core::errorCodeToString(error_code);
-      // Log both the enum name and the numeric value
-      RCLCPP_WARN(
-        get_logger(),
-        "MoveIt plan() failed: %s (%d)",
-        reason.c_str(), error_code.val);
-    
+      RCLCPP_WARN(get_logger(), "MoveIt plan() failed: %s (%d)", reason.c_str(), error_code.val);
       response->success = false;
       response->error_message = reason;
+      reponse->planned_fraction = 0.0;
       return;
     }
 
-    /*
-    bool success = static_cast<bool>(move_group_->plan(my_plan));
-
-    if (!success)
-    {
-      std::string err = "MoveIt plan() failed.";
-      RCLCPP_WARN(this->get_logger(), "%s", err.c_str());
-      response->success = false;
-      response->error_message = err;
-      return;
-    }
-    */
-
-    last_trajectory_ = my_plan.trajectory;
-    has_trajectory_ = true;
-
-    response->success = true;
-    response->error_message = "";
-    response->trajectory = my_plan.trajectory;
-
-    RCLCPP_INFO(this->get_logger(), "Planning successful. Trajectory stored.");
+    trajectory = my_plan.trajectory;
+    RCLCPP_INFO(this->get_logger(), "Standard motion planning successful.");
   }
+
+  last_trajectory_ = trajectory;
+  has_trajectory_ = true;
+
+  response->success = true;
+  response->error_message = "";
+  response->trajectory = trajectory;
+  reponse->planned_fraction = 1.0;
+}
 
   void handle_execute_service(
     const std::shared_ptr<ExecuteService::Request> /*request*/,
