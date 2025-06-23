@@ -6,6 +6,7 @@
 #include <moveit/planning_scene_interface/planning_scene_interface.hpp>
 #include <moveit_msgs/msg/collision_object.hpp>
 #include <optional>
+#include <string>
 
 using std::placeholders::_1;
 using std::placeholders::_2;
@@ -29,16 +30,16 @@ private:
     const std::shared_ptr<AddPrimitive::Request> request,
     std::shared_ptr<AddPrimitive::Response> response)
   {
-    if (!current_session_id_ || request->session_id != current_session_id_) {
+    if (!current_session_id_ || request->session_id != current_session_id_.value()) {
       // New session: clear all obstacles
       auto known_objects = planning_scene_interface_->getKnownObjectNames();
       if (!known_objects.empty()) {
         planning_scene_interface_->removeCollisionObjects(known_objects);
-        RCLCPP_INFO(this->get_logger(), "New session %d detected. Cleared %zu existing objects.",
-                    request->session_id, known_objects.size());
+        RCLCPP_INFO(this->get_logger(), "New session '%s' detected. Cleared %zu existing objects.",
+                    request->session_id.c_str(), known_objects.size());
       } else {
-        RCLCPP_INFO(this->get_logger(), "New session %d detected. No existing objects to clear.",
-                    request->session_id);
+        RCLCPP_INFO(this->get_logger(), "New session '%s' detected. No existing objects to clear.",
+                    request->session_id.c_str());
       }
       current_session_id_ = request->session_id;
     }
@@ -98,7 +99,7 @@ private:
 
   rclcpp::Service<AddPrimitive>::SharedPtr service_;
   std::shared_ptr<moveit::planning_interface::PlanningSceneInterface> planning_scene_interface_;
-  std::optional<int32_t> current_session_id_;  // Stores the active session ID
+  std::optional<std::string> current_session_id_;  // Now a string
 };
 
 int main(int argc, char** argv)
