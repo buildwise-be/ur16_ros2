@@ -64,7 +64,7 @@ void handle_planning_service(
     {
       response->success = false;
       response->error_message = "Cartesian path planning incomplete. Fraction: " + std::to_string(fraction);
-      reponse->planned_fraction = fraction;
+      response->planned_fraction = fraction;
       RCLCPP_WARN(this->get_logger(), "Cartesian path planning incomplete. Fraction: %.2f", fraction);
       return;
     }
@@ -83,7 +83,7 @@ void handle_planning_service(
       RCLCPP_WARN(get_logger(), "MoveIt plan() failed: %s (%d)", reason.c_str(), error_code.val);
       response->success = false;
       response->error_message = reason;
-      reponse->planned_fraction = 0.0;
+      response->planned_fraction = 0.0;
       return;
     }
 
@@ -97,7 +97,7 @@ void handle_planning_service(
   response->success = true;
   response->error_message = "";
   response->trajectory = trajectory;
-  reponse->planned_fraction = 1.0;
+  response->planned_fraction = 1.0;
 }
 
   void handle_execute_service(
