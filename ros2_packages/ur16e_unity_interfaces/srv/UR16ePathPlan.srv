@@ -1,0 +1,8 @@
+geometry_msgs/Pose[] target_poses
+bool use_cartesian
+bool closed_path
+---
+bool success
+string error_message
+moveit_msgs/RobotTrajectory trajectory
+float32 planned_fraction
