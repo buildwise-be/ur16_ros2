@@ -17,6 +17,7 @@ rosidl_generate_interfaces(${PROJECT_NAME}
 	"srv/UR16eMoverService.srv"
 	"srv/UpdatePlanningScene.srv"
 	"srv/AddPrimitive.srv"
+	"srv/UR16ePathPlan.srv"
 	DEPENDENCIES geometry_msgs moveit_msgs shape_msgs builtin_interfaces
        	)
 

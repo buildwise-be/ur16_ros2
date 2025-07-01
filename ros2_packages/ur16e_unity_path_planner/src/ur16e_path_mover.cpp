@@ -1,12 +1,14 @@
 #include <rclcpp/rclcpp.hpp>
 #include <geometry_msgs/msg/pose.hpp>
-#include <moveit/move_group_interface/move_group_interface.h>
+#include <moveit/move_group_interface/move_group_interface.hpp>
 #include <moveit_msgs/msg/robot_trajectory.hpp>
 #include <ur16e_unity_interfaces/srv/ur16e_path_plan.hpp>
-#include <moveit/core/moveit_error_code.h>
+#include <moveit/utils/moveit_error_code.hpp>
 #include <std_srvs/srv/set_bool.hpp>
 
 using PathPlan   = ur16e_unity_interfaces::srv::UR16ePathPlan;
+using std::placeholders::_1;
+using std::placeholders::_2;
 
 class PathMover : public rclcpp::Node, public std::enable_shared_from_this<PathMover>
 {
@@ -21,7 +23,8 @@ public:
   void init_move_group()
   {
     static const std::string GROUP = "ur_manipulator";
-    move_group_ = std::make_shared<moveit::planning_interface::MoveGroupInterface>(shared_from_this(), GROUP);
+    move_group_ = std::make_shared<moveit::planning_interface::MoveGroupInterface>(
+    rclcpp::Node::shared_from_this(), GROUP);
     RCLCPP_INFO(get_logger(), "MoveGroup initialized.");
   }
 
