@@ -183,6 +183,19 @@ def generate_launch_description():
         ],
     )
 
+    # ur16e_path_mover service node
+    path_mover_node = Node(
+        package="ur16e_unity_path_planner",       # your C++ node’s package
+        executable="ur16e_path_mover",         # the name of the executable
+        output="screen",
+        parameters=[
+            moveit_config.robot_description,         # exactly the same URDF parameter
+            moveit_config.robot_description_semantic,# same SRDF parameter
+            moveit_config.robot_description_kinematics,  # same kinematics.yaml
+            {"use_sim_time": use_sim_time},          # if you want the service node to use sim time
+        ],
+    )
+
     #
     # We want to start MoveIt, RViz, Servo and the service node
     # only after “wait_for_robot_description” finishes.
@@ -197,6 +210,7 @@ def generate_launch_description():
                     servo_node,
                     service_node,
                     primitives_updater_node,
+                    path_mover_node,
                 ],
             )
         ),
