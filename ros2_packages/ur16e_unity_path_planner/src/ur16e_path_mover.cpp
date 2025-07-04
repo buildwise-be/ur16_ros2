@@ -10,13 +10,13 @@ using PathPlan   = ur16e_unity_interfaces::srv::UR16ePathPlan;
 using std::placeholders::_1;
 using std::placeholders::_2;
 
-class PathMover : public rclcpp::Node, public std::enable_shared_from_this<PathMover>
+class PathMover : public rclcpp::Node
 {
 public:
   PathMover(const rclcpp::NodeOptions &opts = {}) : Node("ur16e_path_mover", opts)
   {
-    plan_srv_ = create_service<PathPlan>("ur16e_path_plan", std::bind(&PathMover::plan_cb, this, _1, _2));
-    exec_srv_ = create_service<std_srvs::srv::SetBool>("ur16e_path_execute", std::bind(&PathMover::exec_cb, this, std::placeholders::_1, std::placeholders::_2));
+    plan_srv_ = this->create_service<PathPlan>("ur16e_path_plan", std::bind(&PathMover::plan_cb, this, _1, _2));
+    exec_srv_ = this->create_service<std_srvs::srv::SetBool>("ur16e_path_execute", std::bind(&PathMover::exec_cb, this, std::placeholders::_1, std::placeholders::_2));
     RCLCPP_INFO(get_logger(), "Services advertised (init deferred).");
   }
 
