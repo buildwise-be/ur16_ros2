@@ -38,10 +38,24 @@ private:
       res->planned_fraction = 0.0f;
       return;
     }
+  
+	RCLCPP_INFO(this->get_logger(), "Received %zu waypoints for planning.", req->target_poses.size());
 
-    std::vector<geometry_msgs::msg::Pose> wps = req->target_poses;
-    if (req->closed_path && wps.front() != wps.back())
-      wps.push_back(wps.front());
+	std::vector<geometry_msgs::msg::Pose> wps = req->target_poses;
+  	if (req->closed_path && wps.front() != wps.back())
+    	wps.push_back(wps.front());
+
+  	// Check IK for each waypoint
+  	for (size_t i = 0; i < wps.size(); ++i)
+  	{
+    	if (!move_group_->setPoseTarget(wps[i]))
+    	{
+      		res->success = false;
+      		res->fail_msg = "IK failed for waypoint " + std::to_string(i);
+      		RCLCPP_WARN(this->get_logger(), "%s", res->fail_msg.c_str());
+      		return;
+    	}
+  	}
 
     moveit_msgs::msg::RobotTrajectory traj;
     double fraction = move_group_->computeCartesianPath(wps, 0.01, 0.0, traj);
