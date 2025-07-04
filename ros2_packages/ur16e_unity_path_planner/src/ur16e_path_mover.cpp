@@ -41,6 +41,9 @@ private:
   
 	RCLCPP_INFO(this->get_logger(), "Received %zu waypoints for planning.", req->target_poses.size());
 
+	// Set start state to current
+	move_group_->setStartStateToCurrentState();
+
 	std::vector<geometry_msgs::msg::Pose> wps = req->target_poses;
   	if (req->closed_path && wps.front() != wps.back())
     	wps.push_back(wps.front());
