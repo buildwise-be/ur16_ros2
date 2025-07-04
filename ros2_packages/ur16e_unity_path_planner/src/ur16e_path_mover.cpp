@@ -24,7 +24,7 @@ public:
   {
     static const std::string GROUP = "ur_manipulator";
     move_group_ = std::make_shared<moveit::planning_interface::MoveGroupInterface>(
-    rclcpp::Node::shared_from_this(), GROUP);
+    shared_from_this(), GROUP);
     RCLCPP_INFO(get_logger(), "MoveGroup initialized.");
   }
 
