@@ -34,7 +34,7 @@ private:
     if (req->target_poses.empty())
     {
       res->success = false;
-      res->error_message = "No target poses provided.";
+      res->fail_msg = "No target poses provided.";
       res->planned_fraction = 0.0f;
       return;
     }
@@ -50,13 +50,13 @@ private:
     if (fraction < 0.75)
     {
       res->success = false;
-      res->error_message = "Cartesian planning incomplete; fraction=" + std::to_string(fraction);
-      RCLCPP_WARN(get_logger(), "%s", res->error_message.c_str());
+      res->fail_msg = "Cartesian planning incomplete; fraction=" + std::to_string(fraction);
+      RCLCPP_WARN(get_logger(), "%s", res->fail_msg.c_str());
     }
     else
     {
       res->success = true;
-      res->error_message = "";
+      res->fail_msg = "";
       res->trajectory = traj;
       RCLCPP_INFO(get_logger(), "Cartesian path planned successfully (fraction=%.2f)", fraction);
     }

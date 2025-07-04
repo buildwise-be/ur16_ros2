@@ -3,6 +3,6 @@ bool use_cartesian
 bool closed_path
 ---
 bool success
-string error_message
+string fail_msg
 moveit_msgs/RobotTrajectory trajectory
 float32 planned_fraction
