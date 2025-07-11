@@ -1,158 +1,197 @@
+#include <memory>
+#include <sstream>
 #include <rclcpp/rclcpp.hpp>
 #include <geometry_msgs/msg/pose.hpp>
-#include <moveit/robot_state/robot_state.hpp>
-#include <moveit/move_group_interface/move_group_interface.hpp>
-#include <moveit_msgs/msg/robot_trajectory.hpp>
-#include <moveit/utils/moveit_error_code.hpp>
-#include <ur16e_unity_interfaces/srv/ur16e_path_plan.hpp>
-#include <ur16e_unity_interfaces/srv/ur16e_mover_service.hpp>
-#include <std_srvs/srv/set_bool.hpp>
+#include <moveit/planning_interface/move_group_interface/move_group_interface.hpp>
+#include <moveit/planning_scene_monitor/planning_scene_monitor.h>
+#include "ur16e_path_plan/srv/ur16e_path_plan.hpp"
+#include "std_srvs/srv/set_bool.hpp"
 
-using PathPlanSrv = ur16e_unity_interfaces::srv::UR16ePathPlan;
-using MoverSrv    = ur16e_unity_interfaces::srv::UR16eMoverService;
-using std::placeholders::_1;
-using std::placeholders::_2;
-
-class PathMover : public rclcpp::Node
+class UR16ePathMover
+  : public rclcpp::Node
+  , public std::enable_shared_from_this<UR16ePathMover>
 {
 public:
-  PathMover(const rclcpp::NodeOptions &opts = rclcpp::NodeOptions())
-  : Node("ur16e_path_mover", opts)
+  UR16ePathMover()
+  : Node("ur16e_path_mover",
+         rclcpp::NodeOptions()
+           .automatically_declare_parameters_from_overrides(true))
   {
-    // Advertise services
-    path_plan_srv_ = create_service<PathPlanSrv>(
+    RCLCPP_INFO(get_logger(), "Initializing UR16ePathMover");
+
+    // Set up PlanningSceneMonitor for collision checking
+    planning_scene_monitor_ =
+      std::make_shared<planning_scene_monitor::PlanningSceneMonitor>(
+        shared_from_this(), "robot_description");
+    planning_scene_monitor_->startSceneMonitor();
+    planning_scene_monitor_->startWorldGeometryMonitor();
+    planning_scene_monitor_->startStateMonitor();
+
+    // Required MoveGroupInterface init :contentReference[oaicite:0]{index=0}
+    move_group_ = std::make_shared<
+      moveit::planning_interface::MoveGroupInterface>(
+        shared_from_this(), "ur_manipulator");
+    move_group_->setMaxVelocityScalingFactor(0.1);
+    move_group_->setMaxAccelerationScalingFactor(0.1);
+
+    // Services
+    plan_service_ = create_service<ur16e_path_plan::srv::UR16ePathPlan>(
       "ur16e_path_plan",
-      std::bind(&PathMover::path_plan_cb, this, _1, _2));
-    mover_srv_ = create_service<MoverSrv>(
-      "ur16e_mover_service",
-      std::bind(&PathMover::mover_cb, this, _1, _2));
-    exec_srv_ = create_service<std_srvs::srv::SetBool>(
+      std::bind(&UR16ePathMover::planCallback, this,
+                std::placeholders::_1,
+                std::placeholders::_2,
+                std::placeholders::_3));
+
+    execute_service_ = create_service<std_srvs::srv::SetBool>(
       "ur16e_path_execute",
-      std::bind(&PathMover::exec_cb, this, _1, _2));
-
-    // Initialize MoveGroup for the manipulator
-    move_group_ = std::make_shared<moveit::planning_interface::MoveGroupInterface>(
-      shared_from_this(), "ur_manipulator");
-    // Optionally adjust to match your actual workspace
-    move_group_->setWorkspace(-2.0, -2.0, 0.0, 2.0, 2.0, 2.0);
-
-    RCLCPP_INFO(get_logger(), "MoveGroup initialized and services advertised.");
+      std::bind(&UR16ePathMover::executeCallback, this,
+                std::placeholders::_1,
+                std::placeholders::_2,
+                std::placeholders::_3));
   }
 
 private:
-  // Multi-waypoint Cartesian path planning
-  void path_plan_cb(
-    const std::shared_ptr<PathPlanSrv::Request> req,
-    std::shared_ptr<PathPlanSrv::Response> res)
+  using PlanSrv = ur16e_path_plan::srv::UR16ePathPlan;
+  using SetBool  = std_srvs::srv::SetBool;
+
+  void planCallback(
+    const std::shared_ptr<rmw_request_id_t> /*unused*/,
+    const std::shared_ptr<PlanSrv::Request> request,
+    std::shared_ptr<PlanSrv::Response> response)
   {
-    if (req->target_poses.empty()) {
-      res->success = false;
-      res->fail_msg = "No waypoints provided.";
-      return;
+    std::ostringstream dbg;
+    dbg << "Planning request: use_cartesian="
+        << (request->use_cartesian ? "true" : "false")
+        << ", closed_path="
+        << (request->closed_path ? "true" : "false")
+        << ", poses=" << request->target_poses.size() << "\n";
+    RCLCPP_DEBUG(get_logger(), "%s", dbg.str().c_str());
+
+    // Copy and optionally close the loop
+    std::vector<geometry_msgs::msg::Pose> poses = request->target_poses;
+    if (request->closed_path && !poses.empty()) {
+      poses.push_back(poses.front());
+      dbg << "  → Closed path: returning to start\n";
     }
 
-    move_group_->setStartStateToCurrentState();
-    auto kstate = move_group_->getCurrentState();
-    const auto* jmg = kstate->getJointModelGroup(move_group_->getName());
+    // Prepare
+    const std::string group = move_group_->getName();
+    const auto joint_model_group =
+      move_group_->getJointModelGroup(group);
+    robot_trajectory::RobotTrajectory combined_traj(
+      move_group_->getRobotModel(), group);
+    float planned_fraction = 1.0f;
 
-    // Validate IK for each waypoint
-    for (size_t i = 0; i < req->target_poses.size(); ++i) {
-      if (!kstate->setFromIK(jmg, req->target_poses[i], "tool0", 0.1)) {
-        res->success = false;
-        res->fail_msg = "IK failed at waypoint " + std::to_string(i);
+    // Cartesian path planning :contentReference[oaicite:1]{index=1}
+    if (request->use_cartesian) {
+      dbg << "  → Computing Cartesian path with "
+          << poses.size() << " waypoints\n";
+      double fraction = move_group_->computeCartesianPath(
+        poses, 0.01, 0.0, combined_traj);
+      dbg << "  → Fraction achieved: " << fraction << "\n";
+      response->planned_fraction = static_cast<float>(fraction);
+      if (fraction < 1.0) {
+        response->success   = false;
+        response->fail_msg  = dbg.str();
+        RCLCPP_ERROR(get_logger(),
+                     "Cartesian planning failed (%.2f%%)", fraction * 100.0);
         return;
       }
     }
+    else {
+      // Sequential joint-space planning with IK & collision checks
+      for (size_t i = 0; i < poses.size(); ++i) {
+        const auto &pose = poses[i];
+        dbg << "Pose[" << i << "]: IK check\n";
+        auto state = move_group_->getCurrentState();
+        if (!state->setFromIK(joint_model_group, pose, 5.0)) {
+          dbg << "  ✗ IK failed at index " << i << "\n";
+          response->success      = false;
+          response->fail_msg     = dbg.str();
+          response->planned_fraction = float(i) / poses.size();
+          RCLCPP_ERROR(get_logger(), "IK failed at pose %zu", i);
+          return;
+        }
+        dbg << "  ✓ IK OK\n";
 
-    // Compute Cartesian path with collision checking
-    moveit_msgs::msg::RobotTrajectory traj;
-    double fraction = move_group_->computeCartesianPath(
-      req->target_poses,
-      /*eef_step=*/0.01,
-      /*jump_threshold=*/0.0,
-      traj,
-      /*avoid_collisions=*/true);
+        // Collision query
+        if (planning_scene_monitor_
+            ->getPlanningScene()
+            ->isStateColliding(*state, group))
+        {
+          dbg << "  ✗ Collision at index " << i << "\n";
+          response->success      = false;
+          response->fail_msg     = dbg.str();
+          response->planned_fraction = float(i) / poses.size();
+          RCLCPP_ERROR(get_logger(), "Collision at pose %zu", i);
+          return;
+        }
 
-    res->planned_fraction = fraction;
-    if (fraction < 1.0) {
-      res->success = false;
-      res->fail_msg = "Incomplete Cartesian path: fraction=" + std::to_string(fraction);
-      return;
+        // Plan this segment
+        dbg << "  → Planning segment " << i << "\n";
+        move_group_->setStartState(*state);
+        move_group_->setPoseTarget(pose);
+        moveit::planning_interface::MoveGroupInterface::Plan plan;
+        auto ec = move_group_->plan(plan);
+        if (ec != moveit::core::MoveItErrorCode::SUCCESS) {
+          dbg << "  ✗ Planning failed at index " << i
+              << " (code=" << static_cast<int>(ec) << ")\n";
+          response->success      = false;
+          response->fail_msg     = dbg.str();
+          response->planned_fraction = float(i) / poses.size();
+          RCLCPP_ERROR(get_logger(),
+                       "Joint planning failed at pose %zu", i);
+          return;
+        }
+        dbg << "  ✓ Segment " << i << " planned, appending\n";
+        combined_traj.append(plan.trajectory_);
+      }
     }
 
-    res->trajectory = traj;
-    res->success = true;
-    RCLCPP_INFO(get_logger(), "Cartesian path planned (fraction=%.2f)", fraction);
+    // Success: fill response
+    combined_traj.getRobotTrajectoryMsg(response->trajectory);
+    response->success         = true;
+    response->fail_msg.clear();
+    response->planned_fraction = planned_fraction;
+    last_plan_.trajectory_     = combined_traj;
+
+    RCLCPP_INFO(get_logger(), "Planning succeeded");
   }
 
-  // Single-target planning via global planner
-  void mover_cb(
-    const std::shared_ptr<MoverSrv::Request> req,
-    std::shared_ptr<MoverSrv::Response> res)
+  void executeCallback(
+    const std::shared_ptr<rmw_request_id_t> /*unused*/,
+    const std::shared_ptr<SetBool::Request> /*unused*/,
+    std::shared_ptr<SetBool::Response> response)
   {
-    geometry_msgs::msg::Pose goal;
-    goal.position = req->target_pose.position;
-    goal.orientation = req->target_pose.orientation;
-
-    move_group_->setStartStateToCurrentState();
-    move_group_->setPoseTarget(goal);
-    move_group_->setPlanningTime(5.0);
-
-    moveit::planning_interface::MoveGroupInterface::Plan plan;
-    auto result = move_group_->plan(plan);
-
-    if (result == moveit::core::MoveItErrorCode::SUCCESS) {
-      res->success = true;
-      res->trajectory = plan.trajectory;
-      res->message = "Plan successful.";
-      RCLCPP_INFO(get_logger(), "Single-target plan successful.");
-    } else {
-      res->success = false;
-      res->message = "Global planner failed.";
-      RCLCPP_WARN(get_logger(), "Global planner error code: %d", static_cast<int>(result.value()));
+    if (last_plan_.trajectory_.getWayPointCount() == 0) {
+      RCLCPP_ERROR(get_logger(), "No plan to execute");
+      response->success = false;
+      response->message = "No plan available";
+      return;
+    }
+    RCLCPP_INFO(get_logger(), "Executing planned trajectory");
+    // Execute using MoveGroupInterface::execute() :contentReference[oaicite:2]{index=2}
+    bool ok = move_group_->execute(last_plan_);
+    response->success = ok;
+    response->message = ok ? "Execution succeeded"
+                           : "Execution failed";
+    if (!ok) {
+      RCLCPP_ERROR(get_logger(), "Execution error");
     }
   }
 
-  // Execute the last planned trajectory
-  void exec_cb(
-    const std::shared_ptr<std_srvs::srv::SetBool::Request>,
-    std::shared_ptr<std_srvs::srv::SetBool::Response> res)
-  {
-    if (!last_traj_) {
-      res->success = false;
-      res->message = "No trajectory available.";
-      return;
-    }
-
-    // Validate trajectory end joint state
-    const auto& end_positions = last_traj_->joint_trajectory.points.back().positions;
-    if (!move_group_->setJointValueTarget(end_positions)) {
-      res->success = false;
-      res->message = "Invalid end state for execution.";
-      return;
-    }
-
-    moveit::planning_interface::MoveGroupInterface::Plan exec_plan;
-    exec_plan.trajectory = *last_traj_;
-    bool ok = static_cast<bool>(move_group_->execute(exec_plan));
-
-    res->success = ok;
-    res->message = ok ? "Execution started." : "Execution failed.";
-    RCLCPP_INFO(get_logger(), "%s", res->message.c_str());
-  }
-
-  // Members
-  rclcpp::Service<PathPlanSrv>::SharedPtr path_plan_srv_;
-  rclcpp::Service<MoverSrv>::SharedPtr mover_srv_;
-  rclcpp::Service<std_srvs::srv::SetBool>::SharedPtr exec_srv_;
   std::shared_ptr<moveit::planning_interface::MoveGroupInterface> move_group_;
-  std::shared_ptr<moveit_msgs::msg::RobotTrajectory> last_traj_;
+  std::shared_ptr<planning_scene_monitor::PlanningSceneMonitor>
+    planning_scene_monitor_;
+  rclcpp::Service<PlanSrv>::SharedPtr    plan_service_;
+  rclcpp::Service<SetBool>::SharedPtr     execute_service_;
+  moveit::planning_interface::MoveGroupInterface::Plan last_plan_;
 };
 
-int main(int argc, char** argv)
+int main(int argc, char **argv)
 {
   rclcpp::init(argc, argv);
-  auto node = std::make_shared<PathMover>();
+  auto node = std::make_shared<UR16ePathMover>();
   rclcpp::spin(node);
   rclcpp::shutdown();
   return 0;
